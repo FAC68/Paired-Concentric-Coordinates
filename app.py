@@ -14,7 +14,6 @@ from pcoc_iris import (
     circle_labels,
 )
 
-
 # ------------------------------------------------------------
 # PAGE SETUP
 # ------------------------------------------------------------
@@ -31,7 +30,6 @@ st.caption(
     "Paired Concentric Coordinates (PCoC) using the Fisher Iris dataset."
 )
 
-
 # ------------------------------------------------------------
 # LOAD DATA
 # ------------------------------------------------------------
@@ -40,9 +38,7 @@ st.caption(
 def load_data():
     return pd.read_csv("fisher_iris.csv")
 
-
 df = load_data()
-
 
 # ------------------------------------------------------------
 # FEATURES
@@ -62,25 +58,15 @@ pretty_names = {
     "petal.width": "Petal Width"
 }
 
-
 # ------------------------------------------------------------
 # NORMALIZE FULL DATASET
 # ------------------------------------------------------------
 
-X_all = minmax(
-    df[feature_cols].values
-)
+X_all = minmax(df[feature_cols].values)
 
 class_cat = df["class"].astype("category")
-
-class_names = list(
-    class_cat.cat.categories
-)
-
-class_codes_all = (
-    class_cat.cat.codes.to_numpy()
-)
-
+class_names = list(class_cat.cat.categories)
+class_codes_all = class_cat.cat.codes.to_numpy()
 
 # ------------------------------------------------------------
 # SIDEBAR FILTERS
@@ -88,47 +74,27 @@ class_codes_all = (
 
 st.sidebar.header("Filters")
 
-
-# Class filter
 selected_classes = st.sidebar.multiselect(
     "Iris Class",
     class_names,
     default=class_names
 )
 
-
 mask = df["class"].isin(
     selected_classes
 ).to_numpy(copy=True)
 
-
-# ------------------------------------------------------------
-# ATTRIBUTE RANGE FILTERS
-# ------------------------------------------------------------
-
-st.sidebar.subheader(
-    "Attribute Ranges"
-)
-
+st.sidebar.subheader("Attribute Ranges")
 
 for col in feature_cols:
-
-    col_min = float(
-        df[col].min()
-    )
-
-    col_max = float(
-        df[col].max()
-    )
+    col_min = float(df[col].min())
+    col_max = float(df[col].max())
 
     selected_min, selected_max = st.sidebar.slider(
         pretty_names[col],
         min_value=col_min,
         max_value=col_max,
-        value=(
-            col_min,
-            col_max
-        ),
+        value=(col_min, col_max),
         step=0.1
     )
 
@@ -137,46 +103,26 @@ for col in feature_cols:
         selected_max
     ).to_numpy()
 
-
 # ------------------------------------------------------------
 # FILTER DATA
 # ------------------------------------------------------------
 
-filtered_positions = np.flatnonzero(
-    mask
-)
-
+filtered_positions = np.flatnonzero(mask)
 
 if len(filtered_positions) == 0:
-
-    st.warning(
-        "No Iris records match the current filters."
-    )
-
+    st.warning("No Iris records match the current filters.")
     st.stop()
 
-
-filtered_df = df.iloc[
-    filtered_positions
-].copy()
-
-
-X_filtered = X_all[
-    filtered_positions
-]
-
-
-y_filtered = class_codes_all[
-    filtered_positions
-]
-
+filtered_df = df.iloc[filtered_positions].copy()
+X_filtered = X_all[filtered_positions]
+y_filtered = class_codes_all[filtered_positions]
 
 # ------------------------------------------------------------
 # DISPLAY OPTIONS
 # ------------------------------------------------------------
 
 st.sidebar.divider()
-
+st.sidebar.header("Visualization Controls")
 
 display_mode = st.sidebar.radio(
     "Visualization",
@@ -187,12 +133,34 @@ display_mode = st.sidebar.radio(
     ]
 )
 
-
 collocate = st.sidebar.checkbox(
     "Collocate paired circles",
-    value=True
+    value=True,
+    help="Uses shared coordinate circles in the PCoC view."
 )
 
+rotation_degrees = st.sidebar.slider(
+    "Rotate coordinates",
+    min_value=0,
+    max_value=355,
+    value=0,
+    step=5,
+    help="Rotates where normalized values begin around each circle."
+)
+
+start_angle = np.deg2rad(rotation_degrees)
+
+reverse_coordinates = st.sidebar.checkbox(
+    "Reverse coordinate order",
+    value=False,
+    help="Reverses the Iris attribute order before drawing CoC and PCoC."
+)
+
+reverse_direction = st.sidebar.checkbox(
+    "Reverse angular direction",
+    value=False,
+    help="Draws increasing values clockwise instead of counter-clockwise."
+)
 
 span = st.sidebar.slider(
     "Angular Span",
@@ -202,59 +170,69 @@ span = st.sidebar.slider(
     step=0.1
 )
 
+if reverse_direction:
+    span = -span
+
+plot_feature_cols = (
+    list(reversed(feature_cols))
+    if reverse_coordinates
+    else list(feature_cols)
+)
+
+plot_indices = [
+    feature_cols.index(col)
+    for col in plot_feature_cols
+]
+
+X_plot = X_filtered[:, plot_indices]
 
 # ------------------------------------------------------------
-# SELECT A FLOWER TO HIGHLIGHT
+# LINE HIGHLIGHTING
 # ------------------------------------------------------------
+
+st.sidebar.divider()
+st.sidebar.subheader("Line Highlighting")
+
+enable_highlight = st.sidebar.checkbox(
+    "Highlight selected Iris record",
+    value=True
+)
 
 selected_id = st.sidebar.selectbox(
     "Highlight Iris Row ID",
-    filtered_df["id"]
-    .astype(int)
-    .tolist()
+    filtered_df["id"].astype(int).tolist()
 )
-
 
 highlight_matches = np.flatnonzero(
-    filtered_df["id"].to_numpy()
-    == selected_id
+    filtered_df["id"].to_numpy() == selected_id
 )
 
+highlight_local = int(highlight_matches[0])
 
-highlight_local = int(
-    highlight_matches[0]
-)
-
-
-selected_record = filtered_df.iloc[
+highlight_arg = (
     highlight_local
-]
+    if enable_highlight
+    else None
+)
 
+selected_record = filtered_df.iloc[highlight_local]
 
 # ------------------------------------------------------------
 # PAGE LAYOUT
 # ------------------------------------------------------------
 
-left_column, right_column = st.columns(
-    [3, 1]
-)
-
+left_column, right_column = st.columns([3, 1])
 
 # ------------------------------------------------------------
 # SELECTED FLOWER INFO
 # ------------------------------------------------------------
 
 with right_column:
-
-    st.subheader(
-        "Selected Iris"
-    )
+    st.subheader("Selected Iris")
 
     st.metric(
         "Row ID",
-        int(
-            selected_record["id"]
-        )
+        int(selected_record["id"])
     )
 
     st.write(
@@ -281,14 +259,27 @@ with right_column:
         f"**Visible Records:** {len(filtered_df)} / {len(df)}"
     )
 
+    if rotation_degrees != 0:
+        st.info(
+            f"Coordinate mapping rotated {rotation_degrees}°."
+        )
+
+    if reverse_coordinates:
+        st.info(
+            "Coordinate order is reversed."
+        )
+
+    if reverse_direction:
+        st.info(
+            "Angular direction is reversed."
+        )
 
 # ------------------------------------------------------------
 # COC VISUALIZATION
 # ------------------------------------------------------------
 
 def make_coc_axis(ax):
-
-    number_of_features = X_filtered.shape[1]
+    number_of_features = X_plot.shape[1]
 
     radii = attribute_radii(
         number_of_features,
@@ -296,21 +287,20 @@ def make_coc_axis(ax):
     )
 
     points = coc_points(
-        X_filtered,
+        X_plot,
         radii,
-        span
+        span,
+        start=start_angle
     )
 
     labels = [
         pretty_names[col]
-        for col in feature_cols
+        for col in plot_feature_cols
     ]
 
     draw_circles(
         ax,
-        sorted(
-            set(radii)
-        ),
+        sorted(set(radii)),
         circle_labels(
             labels,
             False
@@ -322,7 +312,7 @@ def make_coc_axis(ax):
         points,
         y_filtered,
         class_names,
-        highlight=highlight_local
+        highlight=highlight_arg
     )
 
     ax.set_title(
@@ -332,16 +322,12 @@ def make_coc_axis(ax):
         f"{len(set(radii))} circles per case"
     )
 
-
 # ------------------------------------------------------------
 # PCOC VISUALIZATION
 # ------------------------------------------------------------
 
 def make_pcoc_axis(ax):
-
-    number_of_features = (
-        X_filtered.shape[1]
-    )
+    number_of_features = X_plot.shape[1]
 
     radii = attribute_radii(
         number_of_features,
@@ -349,21 +335,20 @@ def make_pcoc_axis(ax):
     )
 
     points, flags = pcoc_points(
-        X_filtered,
+        X_plot,
         radii,
-        span
+        span,
+        start=start_angle
     )
 
     labels = [
         pretty_names[col]
-        for col in feature_cols
+        for col in plot_feature_cols
     ]
 
     draw_circles(
         ax,
-        sorted(
-            set(radii)
-        ),
+        sorted(set(radii)),
         circle_labels(
             labels,
             collocate
@@ -375,13 +360,11 @@ def make_pcoc_axis(ax):
         points,
         y_filtered,
         class_names,
-        highlight=highlight_local,
+        highlight=highlight_arg,
         arrows=True
     )
 
-    number_of_points = (
-        points.shape[1]
-    )
+    number_of_points = points.shape[1]
 
     ax.set_title(
         "Paired Concentric Coordinates (PCoC)\n"
@@ -389,7 +372,6 @@ def make_pcoc_axis(ax):
         f"{max(number_of_points - 1, 0)} segment • "
         f"{len(set(radii))} circles per case"
     )
-
 
 # ------------------------------------------------------------
 # DRAW VISUALIZATION
@@ -419,7 +401,6 @@ with left_column:
         )
 
         if handles:
-
             fig.legend(
                 handles,
                 labels,
@@ -429,14 +410,8 @@ with left_column:
             )
 
         fig.tight_layout(
-            rect=(
-                0,
-                0.06,
-                1,
-                1
-            )
+            rect=(0, 0.06, 1, 1)
         )
-
 
     elif display_mode == "CoC only":
 
@@ -453,7 +428,6 @@ with left_column:
         )
 
         if handles:
-
             fig.legend(
                 handles,
                 labels,
@@ -463,14 +437,8 @@ with left_column:
             )
 
         fig.tight_layout(
-            rect=(
-                0,
-                0.06,
-                1,
-                1
-            )
+            rect=(0, 0.06, 1, 1)
         )
-
 
     else:
 
@@ -487,7 +455,6 @@ with left_column:
         )
 
         if handles:
-
             fig.legend(
                 handles,
                 labels,
@@ -497,62 +464,41 @@ with left_column:
             )
 
         fig.tight_layout(
-            rect=(
-                0,
-                0.06,
-                1,
-                1
-            )
+            rect=(0, 0.06, 1, 1)
         )
-
 
     st.pyplot(
         fig,
-        use_container_width=True
+        width="stretch"
     )
 
-    plt.close(
-        fig
-    )
-
+    plt.close(fig)
 
 # ------------------------------------------------------------
 # PCOC COMPARISON INFORMATION
 # ------------------------------------------------------------
 
-st.subheader(
-    "Why PCoC?"
-)
+st.subheader("Why PCoC?")
 
-
-metric1, metric2, metric3 = (
-    st.columns(3)
-)
-
+metric1, metric2, metric3 = st.columns(3)
 
 with metric1:
-
     st.metric(
         "CoC Points Per Iris Record",
         4
     )
 
-
 with metric2:
-
     st.metric(
         "PCoC Points Per Iris Record",
         2
     )
 
-
 with metric3:
-
     st.metric(
         "Segments Reduced",
         "3 → 1"
     )
-
 
 st.write(
     "For the four Iris attributes, standard Concentric "
@@ -562,14 +508,17 @@ st.write(
     "two paired points connected by one segment."
 )
 
+st.caption(
+    "Use the sidebar controls to rotate the coordinate mapping, "
+    "reverse the coordinate order or angular direction, filter the "
+    "dataset, and highlight an individual Iris record."
+)
 
 # ------------------------------------------------------------
 # SHOW FILTERED DATA
 # ------------------------------------------------------------
 
-with st.expander(
-    "Show Filtered Iris Data"
-):
+with st.expander("Show Filtered Iris Data"):
 
     st.dataframe(
         filtered_df[
@@ -582,6 +531,6 @@ with st.expander(
                 "petal.width"
             ]
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
